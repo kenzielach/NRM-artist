@@ -21,6 +21,7 @@ class design:
         self.hrad = hrad
         self.xy_coords = np.empty([nholes, 2])
         self.uv_coords = np.empty([x_choose_y(self.nholes, 2), 2])
+        self.mask = np.ones([1090, 1090])
         
     def make_uv_coords(self, uv_coords):
         count = 0
@@ -40,4 +41,13 @@ class design:
     def get_uvs(self):
         self.uv_coords = self.make_uv_coords(self.uv_coords)
         return self.uv_coords
+    
+    def add_to_mask(self, hcoords):
+        for i in hcoords:
+            self.mask[i] = 0
+        return self.mask
+   
+    def update(self, hcoords):
+        self.mask = self.add_to_mask(self.mask, hcoords)
+        return self.mask
                     
