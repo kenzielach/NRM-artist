@@ -15,7 +15,7 @@ def check_placement(coords, hrad, rng, aperture):
         aperture (array): numpy array containing a boolean mask of the Keck primary.
     
     Returns:
-        numpy array: returns the accepted (x,y) coordinates
+        array: returns the accepted (x,y) coordinates
     """
 
     hcoords = 100 * coords + [545, 545] # convert proposed hole center coords to coords in aperture array
@@ -86,6 +86,16 @@ def check_redundancy(my_design):
     return 0
 
 def plot_design(my_design, aperture):
+    """ Plots finished design
+
+    Generates a matplotlib plot of the Keck aperture with the finished mask design projected.
+
+    Args:
+        my_design (object): Instance of design class representing the finished mask design.
+        aperture (array): Numpy array generated from the Keck aperture file provided.
+    
+    """
+
     hcoords = 100 * my_design.xy_coords + [545, 545] # convert hole center coords to coords in aperture array
     for i in range(1090):
         for j in range(1090):
@@ -99,6 +109,18 @@ def plot_design(my_design, aperture):
     plt.show()
 
 def make_design(nholes, hrad): 
+    """ Generates mask design
+
+    Generates a single non-redundant aperture mask design using the user-inputted number of holes and hole radius.
+
+    Args:
+        nholes (int): Number of mask holes.
+        hrad (float): Radius of projected holes in meters.
+
+    Returns:
+        object: Instance of the design class containing a single non-redundant aperture mask design.
+    
+    """
     while 1: # keep looping until we get a valid design
         my_design = design(nholes, hrad) # initialize design object
         rng = np.random.default_rng(seed=None) # set random number generator
