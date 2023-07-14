@@ -6,10 +6,12 @@ nholes = int(input())
 
 print('Please enter the hole radius in meters:')
 
+# add exceptions for hole too small, hole too big, too few holes, nholes not an int
+
 hrad = float(input())
 
 print('Thanks! Generating mask design...')
 
 mask_design = make_design(nholes, hrad)
 
-print('Done!')
+print('Done! Enjoy your mask :)')
