@@ -3,6 +3,26 @@ import matplotlib.pyplot as plt
 import astropy.io.fits as pyfits
 from design_class import *
 
+def add_check_hole(rng, aperture):
+    # do a simple check to make sure the hole center is ok:
+    check = 0
+    while check == 0:
+        hcoords = rng.integers(low=-545, high=545, size=2)
+        hy = int(hcoords[0])
+        hx = int(hcoords[1])
+        if aperture.mask[hy, hx] == 1:
+            check = 1
+    # if this is ok we can check the rest of the hole:
+    dist = np.sqrt(np.sum((aperture.mask - [hcoords[1], hcoords[0]])**2, axis=2)) # distance from hole center to each coordinate pair
+    hcoords_all = np.where(dist <= hrad) # make an array of coordinates in the hole
+    for i in hcoords_all:
+        if aperture.mask[i] == 0:
+            print('Oh no! hole is bad :( Trying again...')
+            add_check_hole(rng, aperture)
+    print('Yay! Hole added to design.')
+    aperture.mask.update(hcoords)
+    return aperture.mask
+
 def check_placement(coords, hrad, rng, aperture):
     """ Check placement of hole
 
