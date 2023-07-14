@@ -3,71 +3,41 @@ import matplotlib.pyplot as plt
 import astropy.io.fits as pyfits
 from design_class import *
 
-def add_check_hole(rng, aperture):
+def add_check_hole(rng, my_design):
     # do a simple check to make sure the hole center is ok:
-    check = 0
-    while check == 0:
-        hcoords = rng.integers(low=-545, high=545, size=2)
-        hy = int(hcoords[0])
-        hx = int(hcoords[1])
-        if aperture.mask[hy, hx] == 1:
-            check = 1
-    # if this is ok we can check the rest of the hole:
-    dist = np.sqrt(np.sum((aperture.mask - [hcoords[1], hcoords[0]])**2, axis=2)) # distance from hole center to each coordinate pair
-    hcoords_all = np.where(dist <= hrad) # make an array of coordinates in the hole
-    for i in hcoords_all:
-        if aperture.mask[i] == 0:
-            print('Oh no! hole is bad :( Trying again...')
-            add_check_hole(rng, aperture)
+    check1 = True
+    while check1 == True:
+        check2 = False
+        while check2 == False: 
+            hcoords = np.array(rng.integers(low=-545, high=545, size=2))
+            hy = int(hcoords[0])
+            hx = int(hcoords[1])
+            if my_design.mask[hy, hx] == 1:
+                check2 = True
+        # if this is ok we can check the rest of the hole:
+        fg = np.array([[[y,x] for x in range(1090)] for y in range(1090)]) # (x,y) coords for each pixel in keck aperture
+        dist = np.sqrt(np.sum((fg - [hy, hx])**2, axis=2)) # distance from hole center to each coordinate pair
+        hcoords_all = np.array(np.where(dist <= my_design.hrad)).T # make an array of coordinates in the hole
+        for i in hcoords_all:
+            hy = i[0]
+            hx = i[1]
+            if my_design.mask[hy, hx] == 0:
+                print('Oh no! hole is bad :( Trying again...')
+                continue
+        check1 = False
     print('Yay! Hole added to design.')
-    aperture.mask.update(hcoords)
-    aperture.xy_coords.append(hcoords)
-    return aperture
+    my_design.mask = update_aperture(hcoords, my_design)
+    my_design.xy_coords.append(hcoords)
+    return my_design
 
-def check_placement(coords, hrad, rng, aperture):
-    """ Check placement of hole
-
-    Called by add_hole(). Checks that a proposed hole doesn't overlap other holes or spiders or mirror segment edges, and that it falls within the Keck aperture. If a hole does not meet requirements, hole is discarded and add_hole() is called again. Repeats until an acceptable hole location is found.
-
-    Args:
-        coords (array): numpy array containing the proposed (x,y) coordinates. 
-        design (object): Mask design object.
-        rng (object): Random number generator.
-        aperture (array): numpy array containing a boolean mask of the Keck primary.
+def update_aperture(hcoords, my_design):
+    hy = int(hcoords[0])
+    hx = int(hcoords[1])
+    fg = np.array([[[y,x] for x in range(1090)] for y in range(1090)]) # (x,y) coords for each pixel in keck aperture
+    dist = np.sqrt(np.sum((fg - [hy, hx])**2, axis=2)) # distance from hole center to each coordinate pair
+    my_design.mask[np.where(dist <= my_design.hrad)] = 0 
     
-    Returns:
-        array: returns the accepted (x,y) coordinates
-    """
-
-    hcoords = 100 * coords + [545, 545] # convert proposed hole center coords to coords in aperture array
-    for i in range(1090):
-        for j in range(1090):
-            if np.sqrt((i - hcoords[0])**2 + (j - hcoords[1])**2) < (100 * hrad):
-                if aperture[i, j] == 0:
-                    print('Oh no! Bad hole placement :( Trying again!')
-                    return 0
-    return 1
-
-def add_hole(hrad, rng, aperture):
-    """ Propose a new mask hole
-
-    Generates a proposed hole (x,y) coordinate set, then calls check_placement() to check whether these coordinates are acceptable. If they are, then these coordinates are returned. 
-    
-    Args:
-        hrad (float): Hole radius in meters.
-        rng (object): Random number generator.
-        aperture (array): numpy array containing a boolean mask of the Keck primary.
-    
-    Returns:
-        array: Returns a numpy array of the accepted hole (x,y) coordinates.
-    """
-    while 1:
-        print('Placing hole...')
-        rand_nums = rng.integers(low=-100, high=100, size=2)
-        coords = (11/2) * rand_nums / 100.
-        if check_placement(coords, hrad, rng, aperture) == 1:
-            print('Yay! found a good hole placement.')
-            return np.array(coords)
+    return my_design.mask
 
 def check_redundancy(my_design):
     """ Check mask baselines for redundancy
@@ -83,6 +53,7 @@ def check_redundancy(my_design):
 
     uv_rad = my_design.hrad
     n = 50000
+    status = 0
     for i in my_design.uv_coords:
         b1 = i
         for j in my_design.uv_coords:
@@ -103,8 +74,8 @@ def check_redundancy(my_design):
                         count2 += 1
                 red = 100 * np.round(count2 / count1, 2)
                 if red > 0:
-                    return 1
-    return 0
+                    status = 1
+    return status
 
 def plot_design(my_design, aperture):
     """ Plots finished design
@@ -117,13 +88,6 @@ def plot_design(my_design, aperture):
     
     """
 
-    hcoords = 100 * my_design.xy_coords + [545, 545] # convert hole center coords to coords in aperture array
-    for i in range(1090):
-        for j in range(1090):
-            for a in range(my_design.nholes):
-                if np.sqrt((i - hcoords[a, 0])**2 + (j - hcoords[a, 1])**2) < (100 * my_design.hrad):
-    
-                     aperture[i, j] = 0
     plt.figure()
     plt.imshow(aperture)
     plt.colorbar()
@@ -142,21 +106,24 @@ def make_design(nholes, hrad):
         object: Instance of the design class containing a single non-redundant aperture mask design.
     
     """
-    while 1: # keep looping until we get a valid design
-        my_design = design(nholes, hrad) # initialize design object
+    status = 1
+    while status == 1: # keep looping until we get a valid design
+        my_design = design(nholes, 100*hrad) # initialize design object
         rng = np.random.default_rng(seed=None) # set random number generator
         aperture = pyfits.getdata('/Users/kenzie/Desktop/CodeAstro/planet-guts/keck_aperture.fits') # set Keck primary aperture
         my_design.mask = aperture
-        for i in range(nholes): # keep adding and checking a single hole until it's acceptable
+        holes_added = 0
+        while holes_added < nholes: # keep adding and checking a single hole until it's acceptable
             my_design = add_check_hole(rng, my_design)
+            holes_added += 1
 
         my_design.get_uvs() # calculate design uv coordinates
 
-        rcheck = check_redundancy(my_design)  # check design for redundancy
-        if rcheck == 1: # if true, there's some redundancy and we need to start over
+        print('Design made! Now checking for redundancy...')
+        status = check_redundancy(my_design)  # check design for redundancy
+        if status == 1: # if true, there's some redundancy and we need to start over
             print("Uh-oh, mask has redundancies! Trying again...")
-        if rcheck == 0: # if this statement is true, exit the loop and return our final design!
+        if status == 0: # if this statement is true, exit the loop and return our final design!
             print("Yay! Mask design is non-redundant. Plotting design...")
-            #print(my_design.xy_coords)
             plot_design(my_design, aperture)
             return my_design
