@@ -21,7 +21,8 @@ def add_check_hole(rng, aperture):
             add_check_hole(rng, aperture)
     print('Yay! Hole added to design.')
     aperture.mask.update(hcoords)
-    return aperture.mask
+    aperture.xy_coords.append(hcoords)
+    return aperture
 
 def check_placement(coords, hrad, rng, aperture):
     """ Check placement of hole
@@ -145,8 +146,9 @@ def make_design(nholes, hrad):
         my_design = design(nholes, hrad) # initialize design object
         rng = np.random.default_rng(seed=None) # set random number generator
         aperture = pyfits.getdata('/Users/kenzie/Desktop/CodeAstro/planet-guts/keck_aperture.fits') # set Keck primary aperture
+        my_design.mask = aperture
         for i in range(nholes): # keep adding and checking a single hole until it's acceptable
-            my_design.xy_coords[i] = add_hole(hrad, rng, aperture)
+            my_design = add_check_hole(rng, my_design)
 
         my_design.get_uvs() # calculate design uv coordinates
 
