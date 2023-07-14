@@ -19,10 +19,9 @@ class design:
     def __init__(self, nholes, hrad):
         self.nholes = nholes
         self.hrad = hrad
-        self.xy_coords = []
+        self.xy_coords = np.empty([nholes, 2])
         self.uv_coords = np.empty([x_choose_y(self.nholes, 2), 2])
-        self.mask = np.empty([1090, 1090])
-
+        
     def make_uv_coords(self, uv_coords):
         count = 0
         for i in range(self.nholes):
@@ -41,3 +40,4 @@ class design:
     def get_uvs(self):
         self.uv_coords = self.make_uv_coords(self.uv_coords)
         return self.uv_coords
+                    
