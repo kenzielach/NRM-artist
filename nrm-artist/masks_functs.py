@@ -18,14 +18,14 @@ def check_placement(coords, hrad, rng, aperture):
         array: returns the accepted (x,y) coordinates
     """
 
-    hcoords = 100 * coords + [545, 545] # convert proposed hole center coords to coords in aperture array
+    hcoords = coords + [545, 545] # convert proposed hole center coords to coords in aperture array
     for i in range(1090):
         for j in range(1090):
             if np.sqrt((i - hcoords[0])**2 + (j - hcoords[1])**2) < (100 * hrad):
                 if aperture[i, j] == 0:
                     print('Oh no! Bad hole placement :( Trying again!')
-                    return 0
-    return 1
+                    return False
+    return True
 
 def add_hole(hrad, rng, aperture):
     """ Propose a new mask hole
@@ -40,11 +40,12 @@ def add_hole(hrad, rng, aperture):
     Returns:
         array: Returns a numpy array of the accepted hole (x,y) coordinates.
     """
+    cp = False
     while 1:
         print('Placing hole...')
-        rand_nums = rng.integers(low=-100, high=100, size=2)
-        coords = (11/2) * rand_nums / 100.
-        if check_placement(coords, hrad, rng, aperture) == 1:
+        coords = np.array(rng.integers(low=-545, high=545, size=2))
+        cp = check_placement(coords, hrad, rng, aperture)
+        if cp == True:
             print('Yay! found a good hole placement.')
             return np.array(coords)
 
@@ -121,12 +122,13 @@ def make_design(nholes, hrad):
         object: Instance of the design class containing a single non-redundant aperture mask design.
     
     """
+   
     while 1: # keep looping until we get a valid design
         my_design = design(nholes, hrad) # initialize design object
         rng = np.random.default_rng(seed=None) # set random number generator
         aperture = pyfits.getdata('/Users/kenzie/Desktop/CodeAstro/planet-guts/keck_aperture.fits') # set Keck primary aperture
         for i in range(nholes): # keep adding and checking a single hole until it's acceptable
-            my_design.xy_coords[i] = add_hole(hrad, rng, aperture)
+            my_design.xy_coords[i, :] = add_hole(hrad, rng, aperture) / 100
 
         my_design.get_uvs() # calculate design uv coordinates
 
