@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import astropy.io.fits as pyfits
 from design_class import *
 
-def check_placement(coords, hrad, rng, aperture):
+def check_placement(hcoords, hrad, rng, aperture):
     """ Check placement of hole
 
     Called by add_hole(). Checks that a proposed hole doesn't overlap other holes or spiders or mirror segment edges, and that it falls within the Keck aperture. If a hole does not meet requirements, hole is discarded and add_hole() is called again. Repeats until an acceptable hole location is found.
@@ -18,14 +18,22 @@ def check_placement(coords, hrad, rng, aperture):
         array: returns the accepted (x,y) coordinates
     """
 
-    hcoords = coords + [545, 545] # convert proposed hole center coords to coords in aperture array
     for i in range(1090):
         for j in range(1090):
             if np.sqrt((i - hcoords[0])**2 + (j - hcoords[1])**2) < (100 * hrad):
                 if aperture[i, j] == 0:
                     print('Oh no! Bad hole placement :( Trying again!')
                     return False
+    print('Yay! found a good hole placement.')
     return True
+
+def check_hole_cent(hcoords, aperture):
+    hy = hcoords[0]
+    hx = hcoords[1]
+    if aperture[hy, hx] == 0:
+        return False
+    else:
+        return True
 
 def add_hole(hrad, rng, aperture):
     """ Propose a new mask hole
@@ -40,13 +48,14 @@ def add_hole(hrad, rng, aperture):
     Returns:
         array: Returns a numpy array of the accepted hole (x,y) coordinates.
     """
-    cp = False
+
+    print('Placing hole...')
     while 1:
-        print('Placing hole...')
         coords = np.array(rng.integers(low=-545, high=545, size=2))
-        cp = check_placement(coords, hrad, rng, aperture)
-        if cp == True:
-            print('Yay! found a good hole placement.')
+        hcoords = coords + [545, 545] # convert proposed hole center coords to coords in aperture array
+        if check_hole_cent(hcoords, aperture) == False:
+            continue
+        if check_placement(hcoords, hrad, rng, aperture) == True:
             return np.array(coords)
 
 def check_redundancy(my_design):
@@ -97,7 +106,7 @@ def plot_design(my_design, aperture):
     
     """
 
-    hcoords = 100 * my_design.xy_coords + [545, 545] # convert hole center coords to coords in aperture array
+    hcoords = my_design.xy_coords + [545, 545] # convert hole center coords to coords in aperture array
     for i in range(1090):
         for j in range(1090):
             for a in range(my_design.nholes):
@@ -128,7 +137,7 @@ def make_design(nholes, hrad):
         rng = np.random.default_rng(seed=None) # set random number generator
         aperture = pyfits.getdata('/Users/kenzie/Desktop/CodeAstro/planet-guts/keck_aperture.fits') # set Keck primary aperture
         for i in range(nholes): # keep adding and checking a single hole until it's acceptable
-            my_design.xy_coords[i, :] = add_hole(hrad, rng, aperture) / 100
+            my_design.xy_coords[i, :] = add_hole(hrad, rng, aperture)
 
         my_design.get_uvs() # calculate design uv coordinates
 
