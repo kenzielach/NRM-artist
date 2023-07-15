@@ -19,7 +19,17 @@ def check_hole_cent(hcoords, aperture):
 ########################################################################################################
 ########################################################################################################
 
-#def check_hole_overlap(hcoords, aperture):
+def check_hole_overlap(hcoords, hcoords_list, hrad):
+    if len(hcoords_list) == 0:
+        return True
+    else:
+        for i in hcoords_list:
+            dist = np.sqrt((i[0] - hcoords[0])**2 + (i[1] - hcoords[1])**2)
+            if dist < 100 * hrad:
+                return False
+            else:
+                continue
+
 
 ########################################################################################################
 ########################################################################################################
@@ -44,16 +54,14 @@ def check_spiders_gaps(hcoords, hrad, aperture):
         for j in range(1090):
             if np.sqrt((i - hcoords[0])**2 + (j - hcoords[1])**2) < (100 * hrad):
                 if aperture[i, j] == 0:
-                    print('Oh no! Bad hole placement :( Trying again!')
                     return False
-    print('Yay! found a good hole placement.')
     return True
 
 ########################################################################################################
 ########################################################################################################
 ########################################################################################################
 
-def add_hole(hrad, rng, aperture):
+def add_hole(hrad, rng, aperture, hcoords_list):
     """ Propose a new mask hole
 
     Generates a proposed hole (x,y) coordinate set, then calls check_placement() to check whether these coordinates are acceptable. If they are, then these coordinates are returned. 
@@ -75,6 +83,10 @@ def add_hole(hrad, rng, aperture):
             continue
         if check_spiders_gaps(hcoords, hrad, aperture) == False:
             continue
+        if check_hole_overlap(hcoords, hcoords_list, hrad) == False:
+            continue
+        print('Yay! Acceptable hole placement found.')
+        hcoords_list.append(hcoords)
         return np.array(hcoords)
 
 ########################################################################################################
@@ -165,10 +177,11 @@ def make_design(nholes, hrad):
    
     while 1: # keep looping until we get a valid design
         my_design = design(nholes, hrad) # initialize design object
+        hcoords_list = []
         rng = np.random.default_rng(seed=None) # set random number generator
         aperture = pyfits.getdata('/Users/kenzie/Desktop/CodeAstro/planet-guts/keck_aperture.fits') # set Keck primary aperture
         for i in range(nholes): # keep adding and checking a single hole until it's acceptable
-            my_design.xy_coords_cm[i, :] = add_hole(hrad, rng, aperture)
+            my_design.xy_coords_cm[i, :] = add_hole(hrad, rng, aperture, hcoords_list)
 
         my_design.get_xy_m() # convert (x,y) coords in cm to m
         my_design.get_uvs() # calculate design uv coordinates
