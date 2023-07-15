@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import astropy.io.fits as pyfits
 from design_class import *
 
-def check_placement(hcoords, hrad, rng, aperture):
+def check_placement(hcoords, hrad, aperture):
     """ Check placement of hole
 
     Called by add_hole(). Checks that a proposed hole doesn't overlap other holes or spiders or mirror segment edges, and that it falls within the Keck aperture. If a hole does not meet requirements, hole is discarded and add_hole() is called again. Repeats until an acceptable hole location is found.
@@ -55,7 +55,7 @@ def add_hole(hrad, rng, aperture):
         hcoords = coords + [545, 545] # convert proposed hole center coords to coords in aperture array
         if check_hole_cent(hcoords, aperture) == False:
             continue
-        if check_placement(hcoords, hrad, rng, aperture) == True:
+        if check_placement(hcoords, hrad, aperture) == True:
             return np.array(coords)
 
 def check_redundancy(my_design):
