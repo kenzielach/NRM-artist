@@ -99,9 +99,11 @@ def add_hole(hrad, rng, aperture, hcoords_list):
             continue
         if check_hole_overlap(hcoords, hcoords_list, hrad) == False:
             continue
+        if len(hcoords_list) > 0:
+            coords2check = hcoords_list + hcoords
         print('Yay! Acceptable hole placement found.')
         hcoords_list.append(hcoords)
-        return np.array(hcoords)
+        return np.array(hcoords), hcoords_list
 
 ########################################################################################################
 ########################################################################################################
@@ -173,7 +175,6 @@ def plot_design(my_design, aperture):
         for j in range(1090):
             for a in range(my_design.nholes):
                 if np.sqrt((i - hcoords[a, 0])**2 + (j - hcoords[a, 1])**2) < (100 * my_design.hrad):
-    
                      aperture[i, j] = 0
     plt.figure()
     plt.imshow(aperture)
@@ -204,8 +205,8 @@ def make_design(nholes, hrad):
         rng = np.random.default_rng(seed=None) # set random number generator
         aperture = pyfits.getdata('/Users/kenzie/Desktop/CodeAstro/planet-guts/keck_aperture.fits') # set Keck primary aperture
         for i in range(nholes): # keep adding and checking a single hole until it's acceptable
-            my_design.xy_coords_cm[i, :] = add_hole(hrad, rng, aperture, hcoords_list)
-
+            my_design.xy_coords_cm[i, :], hcoords_list = add_hole(hrad, rng, aperture, hcoords_list)
+            print(len(hcoords_list))
         my_design.get_xy_m() # convert (x,y) coords in cm to m
         my_design.get_uvs() # calculate design uv coordinates
 
