@@ -216,3 +216,6 @@ def make_design(nholes, hrad):
             print("Yay! Mask design is non-redundant. Plotting design...")
             plot_design(my_design, aperture)
             return my_design
+    
+def save_design(mask_design):
+    np.save('/Users/kenzie/Desktop/Laniakea/Finalized_mask_pipeline/masks/my_design.npy', mask_design)
