@@ -7,6 +7,20 @@ from design_class import *
 ########################################################################################################
 ########################################################################################################
 
+def check_valid_nholes(nholes):
+    if nholes < 3:
+        raise AttributeError(f"Oops! Please enter at least 3 holes for your mask.")
+    
+def check_valid_hrad(hrad):
+    if hrad < 0.01:
+        raise AttributeError(f'Oops! Hole size is too small.')
+    if hrad > 0.77:
+        raise AttributeError(f'Oops! Hole size is too big.')
+
+########################################################################################################
+########################################################################################################
+########################################################################################################
+
 def check_hole_cent(hcoords, aperture):
     hy = hcoords[0]
     hx = hcoords[1]
@@ -126,10 +140,19 @@ def check_redundancy(my_design):
                     if dist_b1[q] <= uv_rad and dist_b2[q] < uv_rad:
                         count2 += 1
                 red = 100 * np.round(count2 / count1, 2)
+                rbl1_h1 = # hole 1 of one redundant baseline
+                rbl1_h2 = # hole 2 of the same redundant baseline
                 if red > 0:
-                    return 1
+                    return 1, rbl1_h1, rbl1_h2
     return 0
 
+########################################################################################################
+########################################################################################################
+########################################################################################################
+
+def replace_hole(hrad, rng, aperture, hcoords_list):
+    
+    
 ########################################################################################################
 ########################################################################################################
 ########################################################################################################
@@ -186,11 +209,10 @@ def make_design(nholes, hrad):
         my_design.get_xy_m() # convert (x,y) coords in cm to m
         my_design.get_uvs() # calculate design uv coordinates
 
-        rcheck = check_redundancy(my_design)  # check design for redundancy
+        rcheck, rbl = check_redundancy(my_design)  # check design for redundancy
         if rcheck == 1: # if true, there's some redundancy and we need to start over
-            print("Uh-oh, mask has redundancies! Trying again...")
+            print("Uh-oh, mask has redundancies! " + str(len(rbl)) + " baselines are redundant. Trying to fix...")
         if rcheck == 0: # if this statement is true, exit the loop and return our final design!
             print("Yay! Mask design is non-redundant. Plotting design...")
-            #print(my_design.xy_coords)
             plot_design(my_design, aperture)
             return my_design
