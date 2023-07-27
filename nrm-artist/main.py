@@ -10,4 +10,8 @@ check_valid_hrad(hrad)
 
 print('Thanks! Generating mask design...')
 mask_design = make_design(nholes, hrad)
+print('Would you like to save your mask as an .npy (y/n)?')
+ans = str(input())
+if ans == 'y':
+    save_design(mask_design)
 print('Done! Enjoy your mask :)')
