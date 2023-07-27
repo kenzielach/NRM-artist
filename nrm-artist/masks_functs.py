@@ -64,11 +64,13 @@ def check_spiders_gaps(hcoords, hrad, aperture):
         array: returns the accepted (x,y) coordinates
     """
 
-    for i in range(1090):
-        for j in range(1090):
-            if np.sqrt((i - hcoords[0])**2 + (j - hcoords[1])**2) < (100 * hrad):
-                if aperture[i, j] == 0:
-                    return False
+    xvals = np.arange(0, 1090, 1).reshape([1, 1090])
+    yvals = np.flip(np.arange(0, 1090, 1).reshape([1090, 1]))
+    distances = np.sqrt((xvals - hcoords[1])**2 + (yvals - hcoords[0])**2)
+    distances[distances < 1.0] = 1000.
+    distances[distances < (100 * hrad)] = -100.0
+    if np.min(distances + 200*aperture) < -10.0:
+        return False
     return True
 
 ########################################################################################################
@@ -89,7 +91,6 @@ def add_hole(hrad, rng, aperture, hcoords_list):
         array: Returns a numpy array of the accepted hole (x,y) coordinates.
     """
 
-    print('Placing hole...')
     while 1:
         coords = np.array(rng.integers(low=-545, high=545, size=2))
         hcoords = coords + [545, 545] # convert proposed hole center coords to coords in aperture array
@@ -99,9 +100,8 @@ def add_hole(hrad, rng, aperture, hcoords_list):
             continue
         if check_hole_overlap(hcoords, hcoords_list, hrad) == False:
             continue
-        if len(hcoords_list) > 0:
-            coords2check = hcoords_list + hcoords
-        print('Yay! Acceptable hole placement found.')
+        #if len(hcoords_list) > 0:
+        #    coords2check = hcoords_list + hcoords
         hcoords_list.append(hcoords)
         return np.array(hcoords), hcoords_list
 
@@ -206,9 +206,10 @@ def make_design(nholes, hrad):
         aperture = pyfits.getdata('/Users/kenzie/Desktop/CodeAstro/planet-guts/keck_aperture.fits') # set Keck primary aperture
         for i in range(nholes): # keep adding and checking a single hole until it's acceptable
             my_design.xy_coords_cm[i, :], hcoords_list = add_hole(hrad, rng, aperture, hcoords_list)
-            print(len(hcoords_list))
         my_design.get_xy_m() # convert (x,y) coords in cm to m
         my_design.get_uvs() # calculate design uv coordinates
+
+        print('Found holes, checking redundancy...')
 
         rcheck = check_redundancy(my_design)  # check design for redundancy
         if rcheck == 1: # if true, there's some redundancy and we need to start over
