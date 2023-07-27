@@ -77,7 +77,7 @@ def check_spiders_gaps(hcoords, hrad, aperture):
 ########################################################################################################
 ########################################################################################################
 
-def add_hole(hrad, rng, aperture, hcoords_list):
+def add_hole(rng, aperture, my_design, hcoords_list):
     """ Propose a new mask hole
 
     Generates a proposed hole (x,y) coordinate set, then calls check_placement() to check whether these coordinates are acceptable. If they are, then these coordinates are returned. 
@@ -90,20 +90,31 @@ def add_hole(hrad, rng, aperture, hcoords_list):
     Returns:
         array: Returns a numpy array of the accepted hole (x,y) coordinates.
     """
-
-    while 1:
+    i = 0
+    flag = 0
+    while i < 50:
         coords = np.array(rng.integers(low=-545, high=545, size=2))
         hcoords = coords + [545, 545] # convert proposed hole center coords to coords in aperture array
         if check_hole_cent(hcoords, aperture) == False:
             continue
-        if check_spiders_gaps(hcoords, hrad, aperture) == False:
+        if check_spiders_gaps(hcoords, my_design.hrad, aperture) == False:
             continue
-        if check_hole_overlap(hcoords, hcoords_list, hrad) == False:
+        if check_hole_overlap(hcoords, hcoords_list, my_design.hrad) == False:
             continue
         #if len(hcoords_list) > 0:
-        #    coords2check = hcoords_list + hcoords
+        #    tmp_xycoords = np.array(list(my_design.xy_coords_cm) + hcoords)
+        #    tmp_design = design(my_design.nholes, my_design.hrad)
+        #    tmp_design.xy_coords_cm = tmp_xycoords
+        #    tmp_design.get_xy_m() # convert (x,y) coords in cm to m
+        #    tmp_design.get_uvs()
+        #    if check_redundancy(tmp_design) == 1:
+        #        i += 1
+        #        continue
         hcoords_list.append(hcoords)
-        return np.array(hcoords), hcoords_list
+        print('yay')
+        return np.array(hcoords), hcoords_list, flag
+    flag = 1
+    return np.array(hcoords), hcoords_list, flag
 
 ########################################################################################################
 ########################################################################################################
@@ -142,10 +153,8 @@ def check_redundancy(my_design):
                     if dist_b1[q] <= uv_rad and dist_b2[q] < uv_rad:
                         count2 += 1
                 red = 100 * np.round(count2 / count1, 2)
-                #rbl1_h1 = # hole 1 of one redundant baseline
-                #rbl1_h2 = # hole 2 of the same redundant baseline
                 if red > 0:
-                    return 1#, rbl1_h1, rbl1_h2
+                    return 1
     return 0
 
 ########################################################################################################
@@ -205,11 +214,16 @@ def make_design(nholes, hrad):
         rng = np.random.default_rng(seed=None) # set random number generator
         aperture = pyfits.getdata('/Users/kenzie/Desktop/CodeAstro/planet-guts/keck_aperture.fits') # set Keck primary aperture
         for i in range(nholes): # keep adding and checking a single hole until it's acceptable
-            my_design.xy_coords_cm[i, :], hcoords_list = add_hole(hrad, rng, aperture, hcoords_list)
+            my_design.xy_coords_cm[i, :], hcoords_list, flag = add_hole(rng, aperture, my_design, hcoords_list)
+            if flag == 1:
+                break
+        if flag == 1:
+            print('hit a snag, starting over...')
+            continue
         my_design.get_xy_m() # convert (x,y) coords in cm to m
         my_design.get_uvs() # calculate design uv coordinates
 
-        print('Found holes, checking redundancy...')
+        #print('Found holes, checking redundancy...')
 
         rcheck = check_redundancy(my_design)  # check design for redundancy
         if rcheck == 1: # if true, there's some redundancy and we need to start over
