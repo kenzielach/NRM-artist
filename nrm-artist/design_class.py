@@ -31,8 +31,8 @@ class design:
                 if (i == j) or (j < i):
                     continue
                 xy2 = self.xy_coords_m[j]
-                u = np.abs(xy1[0] - xy2[0])
-                v = np.abs(xy1[1] - xy2[1])
+                u = xy1[0] - xy2[0]
+                v = xy1[1] - xy2[1]
                 uv_coords[count] = [u, v]
                 count += 1
         self.uv_coords = uv_coords
