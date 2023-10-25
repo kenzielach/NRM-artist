@@ -111,7 +111,6 @@ def add_hole(rng, aperture, my_design, hcoords_list):
         #        i += 1
         #        continue
         hcoords_list.append(hcoords)
-        print('yay')
         return np.array(hcoords), hcoords_list, flag
     flag = 1
     return np.array(hcoords), hcoords_list, flag
@@ -152,8 +151,8 @@ def check_redundancy(my_design):
                 for q in range(n):
                     if dist_b1[q] <= uv_rad and dist_b2[q] < uv_rad:
                         count2 += 1
-                red = 100 * np.round(count2 / count1, 2)
-                if red > 0:
+                red = np.round(count2 / count1, 2)
+                if red > 0.5:
                     return 1
     return 0
 
