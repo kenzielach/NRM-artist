@@ -229,10 +229,11 @@ def make_design(nholes, hrad, return_vcoords=False):
     Args:
         nholes (int): Number of mask holes.
         hrad (float): Radius of projected holes in meters.
-
+        return_vcoords (bool): If True will also return list of hole (x,y) coordinates.
     Returns:
         object: Instance of the design class containing a single non-redundant aperture mask design.
-    
+        array (optional): Array containing list of hole (x,y) coordinates.
+        
     """
 
     vcoords0 = np.loadtxt('/Users/kenzie/Desktop/Laniakea/Finalized_mask_pipeline/masks/vcoords_keck9hole.txt')
@@ -245,26 +246,16 @@ def make_design(nholes, hrad, return_vcoords=False):
         rng = np.random.default_rng(seed=None) # set random number generator
         for i in range(nholes): # keep adding and checking a single hole until it's acceptable
             my_design.xy_coords_cm[i, :], hcoords_list, vcoords = add_hole_cent(rng, hcoords_list, vcoords)
-            #my_design.xy_coords_cm[i, :], hcoords_list, flag = add_hole(rng, aperture, my_design, hcoords_list)
-            #if flag == 1:
-                #break
-        #if flag == 1:
-            #print('hit a snag, starting over...')
-            #continue
         my_design.get_xy_m() # convert (x,y) coords in cm to m
         my_design.get_uvs() # calculate design uv coordinates
-
-        #print('Found holes, checking redundancy...')
-
         rcheck = check_redundancy(my_design)  # check design for redundancy
-        #if rcheck == 1: # if true, there's some redundancy and we need to start over
-        #    print("Uh-oh, mask has redundancies! " + "some baselines are redundant. Trying to fix...")
         if rcheck == 0: # if this statement is true, exit the loop and return our final design!
             if return_vcoords == True:
                 return my_design, vcoords
             else:
                 print("Yay! Mask design is non-redundant. Plotting design...")
                 plot_design(my_design, aperture)
+                print("Done!")
                 return my_design
             
 ########################################################################################################
@@ -292,7 +283,7 @@ def add_to_design(mask_design, diff, vcoords0):
                 vcoords = vcoords0 # return vcoords to normal
                 count += 1
                 if count == len(vcoords0 - mask_design.nholes):
-                    print("Couldn't find a non-redundant design :(")
+                    #print("Couldn't find a non-redundant design :(")
                     return mask_design
             if rcheck == 0: # if the new hole is non-redundant:
                 mask_design.xy_coords_cm = np.append(mask_design.xy_coords_cm, np.reshape(new_hole, [1,2]), axis=0) # add new hole to design
@@ -311,3 +302,15 @@ def save_design(mask_design):
     n = 9
     np.save('/Users/kenzie/Desktop/Laniakea/Finalized_mask_pipeline/masks/9hole' + str(n) + '_xycoords.npy', mask_design.xy_coords_m)
     np.save('/Users/kenzie/Desktop/Laniakea/Finalized_mask_pipeline/masks/9hole' + str(n) + '_uvcoords.npy', mask_design.uv_coords)
+
+########################################################################################################
+########################################################################################################
+########################################################################################################
+
+#def check_uv_cov(mask_design):
+ #val = #some value representing uv coverage I calculate
+ #gval = "good" threshold for val
+ #if val < gval (or some other bad condition):
+ #   return 0
+ #else:
+ #   return 1
