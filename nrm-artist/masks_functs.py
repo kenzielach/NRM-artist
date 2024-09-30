@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import astropy.io.fits as pyfits
 from design_class import *
+from scipy.optimize import curve_fit 
 
 ########################################################################################################
 ########################################################################################################
@@ -122,10 +123,10 @@ def add_hole(rng, aperture, my_design, hcoords_list):
         #        i += 1
         #        continue
         hcoords_list.append(hcoords)
-        print('yay')
+        #print('yay')
         return np.array(hcoords), hcoords_list, flag
     flag = 1
-    return np.array(hcoords), hcoords_list, flag
+    return np.array(hcoords), hcoords_list #, flag
 
 ########################################################################################################
 ########################################################################################################
@@ -142,11 +143,14 @@ def check_redundancy(my_design):
     Returns:
         bool: Returns 1 if the mask has any redundancy, returns 0 if mask is fully non-redundant.
     """
-    pmask = 25 # radius in pixels
+    pmask = 25 # radius in pixels for 0.5m mask
+    #pmask = 31 # radius in pixels for 0.65m mask
     #psc = 
+    lam = 5.23*1e-6 # wavelength to use in meters; central wavelength of the band
     avg = 0
     count = 0
-    uv_rad = my_design.hrad
+    fact = 2*np.pi*206265/lam
+    uv_rad = my_design.hrad * fact # need to change this
     n = 50000
     ci = 0
     for i in my_design.uv_coords:
@@ -181,7 +185,7 @@ def check_redundancy(my_design):
         avg_f = avg / count
     if avg_f > 0:
         return 1
-    return 0
+    return 'hello'
 
 ########################################################################################################
 ########################################################################################################
@@ -207,14 +211,20 @@ def plot_design(my_design, aperture):
 
     hcoords = my_design.xy_coords_cm
 
+    if np.ndarray.flatten(hcoords > 545).any():
+        print('warning: coords not centered! fixing...')
+        hcoords -= [545, 545]
+    
     for i in range(1090):
         for j in range(1090):
             for a in range(my_design.nholes):
-                if np.sqrt((i - hcoords[a, 0])**2 + (j - hcoords[a, 1])**2) < (100 * my_design.hrad):
+                if np.sqrt(((i - 545) - hcoords[a, 0])**2 + ((j - 545) - hcoords[a, 1])**2) < (100 * my_design.hrad):
                      aperture[i, j] = 0
     
     plt.figure()
     plt.imshow(aperture)
+    plt.xticks([])
+    plt.yticks([])
     plt.show()
 
 ########################################################################################################
@@ -237,7 +247,7 @@ def make_design(nholes, hrad, return_vcoords=False):
     """
 
     vcoords0 = np.loadtxt('/Users/kenzie/Desktop/Laniakea/Finalized_mask_pipeline/masks/vcoords_keck9hole.txt')
-    aperture = pyfits.getdata('/Users/kenzie/Desktop/CodeAstro/planet-guts/keck_aperture.fits') # set Keck primary aperture
+    #aperture = pyfits.getdata('/Users/kenzie/Desktop/CodeAstro/planet-guts/keck_aperture.fits') # set Keck primary aperture
 
     while 1: # keep looping until we get a valid design
         vcoords = vcoords0
@@ -253,9 +263,10 @@ def make_design(nholes, hrad, return_vcoords=False):
             if return_vcoords == True:
                 return my_design, vcoords
             else:
-                print("Yay! Mask design is non-redundant. Plotting design...")
-                plot_design(my_design, aperture)
-                print("Done!")
+                #print("Yay! Mask design is non-redundant. Plotting design...")
+                #plot_design(my_design, aperture)
+            #    print("Done!")
+                print('stuff')
                 return my_design
             
 ########################################################################################################
@@ -263,7 +274,7 @@ def make_design(nholes, hrad, return_vcoords=False):
 ########################################################################################################   
     
 def add_to_design(mask_design, diff, vcoords0):
-    aperture = pyfits.getdata('/Users/kenzie/Desktop/CodeAstro/planet-guts/keck_aperture.fits') # set Keck primary aperture
+    #aperture = pyfits.getdata('/Users/kenzie/Desktop/CodeAstro/planet-guts/keck_aperture.fits') # set Keck primary aperture
     vcoords = vcoords0
     hcoords_list = mask_design.xy_coords_cm.tolist()
     rng = np.random.default_rng(seed=None)
@@ -283,15 +294,15 @@ def add_to_design(mask_design, diff, vcoords0):
                 vcoords = vcoords0 # return vcoords to normal
                 count += 1
                 if count == len(vcoords0 - mask_design.nholes):
-                    #print("Couldn't find a non-redundant design :(")
+                    print("Couldn't find a non-redundant design :(")
                     return mask_design
             if rcheck == 0: # if the new hole is non-redundant:
                 mask_design.xy_coords_cm = np.append(mask_design.xy_coords_cm, np.reshape(new_hole, [1,2]), axis=0) # add new hole to design
                 mask_design.nholes += 1 # increase nholes
                 mask_design.xy_coords_m = mask_design.xy_coords_cm / 100
                 break # break out of while loop, go on to next hole
-    print("Yay! Mask design is non-redundant. Plotting design...")
-    plot_design(mask_design, aperture)
+    #print("Yay! Mask design is non-redundant. Plotting design...")
+    #plot_design(mask_design, aperture)
     return mask_design # return updated design
 
 ########################################################################################################
@@ -299,18 +310,179 @@ def add_to_design(mask_design, diff, vcoords0):
 ########################################################################################################
 
 def save_design(mask_design):
-    n = 9
-    np.save('/Users/kenzie/Desktop/Laniakea/Finalized_mask_pipeline/masks/9hole' + str(n) + '_xycoords.npy', mask_design.xy_coords_m)
-    np.save('/Users/kenzie/Desktop/Laniakea/Finalized_mask_pipeline/masks/9hole' + str(n) + '_uvcoords.npy', mask_design.uv_coords)
+    n = mask_design.nholes
+    np.save('/Users/kenzie/Desktop/Laniakea/Finalized_mask_pipeline/masks/' + str(n) + 'hole_xycoords.npy', mask_design.xy_coords_m)
+    np.save('/Users/kenzie/Desktop/Laniakea/Finalized_mask_pipeline/masks/' + str(n) + 'hole_uvcoords.npy', mask_design.uv_coords)
 
 ########################################################################################################
 ########################################################################################################
 ########################################################################################################
 
-#def check_uv_cov(mask_design):
- #val = #some value representing uv coverage I calculate
- #gval = "good" threshold for val
- #if val < gval (or some other bad condition):
- #   return 0
- #else:
- #   return 1
+#def calc_uv_param(mask_design):
+    #n = 100
+    #coordsx, coordsy = np.meshgrid(np.linspace(0, 1000, int(np.sqrt(n))), np.linspace(0, 500, int(np.sqrt(n))))
+    #coordsx2, coordsy2 = np.meshgrid(np.linspace(500, 1000, int(np.sqrt(n)/2)), np.linspace(0, 1000, int(np.sqrt(n)/2)))
+    #coords = np.vstack([coordsx.ravel(), coordsy.ravel()]).T
+    #coords2 = np.vstack([coordsx2.ravel(), coordsy2.ravel()]).T
+    #xy = np.loadtxt('/Users/kenzie/Desktop/Laniakea/Finalized_mask_pipeline/masks/SPIE_2024/9hole_nirc2_xycoords_cent.txt')
+    #coords = np.append(mask_design.uv_coords, -mask_design.uv_coords, axis=0)
+
+    #plt.figure()
+    #plt.scatter(coords[:, 0], coords[:, 1])
+    #plt.show()
+
+    #flatx = np.sort(coords[:, 0])
+    #flaty = np.sort(coords[:, 1])
+
+    #p, resid, n1, n2, n3  = np.polyfit(flatx, flaty, deg=1, full=True)
+    #print(p[1])
+    #print(resid) # / (len(flatx) - 2))
+
+    #plt.figure()
+    #plt.scatter(np.arange(-10, 10), np.arange(-10, 10))
+    #plt.scatter(flatx, flaty)
+    #plt.show()
+
+    return(p[0], p[1], resid)
+
+def plot_ps(mask_design):
+    coords = np.append(mask_design.uv_coords, -mask_design.uv_coords, axis=0)
+    #flatx = np.sort(coords[:, 0])
+    #flaty = np.sort(coords[:, 1])
+    #plt.figure()
+    #plt.scatter(np.arange(-10, 10), np.arange(-10, 10))
+    #plt.scatter(flatx, flaty)
+    #plt.show()
+
+    #xlocs = np.linspace(-10, 10, num_bins)
+    #ylocs = np.linspace(-10, 10, num_bins)
+
+    #plt.figure()
+    #plt.scatter(coords[:, 0], coords[:, 1])
+    #for i in range(len(xlocs)):
+    #    plt.axvline(xlocs[i], -10, 10)
+    #    plt.axhline(ylocs[i], -10, 10)
+    #plt.show()
+
+    dim = 200
+
+    stuff = np.zeros([dim, dim])
+    x = np.round(np.linspace(-10, 10, dim+1), 1)
+    coords2 = np.round(coords, 1)
+
+    for i in range(dim):
+        for j in range(dim):
+            for k in coords2:
+                if ([x[i], x[j]] == k).all() == 1:
+                    stuff[i, j] = 1
+
+    #plt.figure()
+    #plt.imshow(stuff)
+    #plt.show()
+
+    #params, covar, fit, stdx, stdy = fit_ps_fft(stuff)
+    #dim = int(np.sqrt(len(fit)))
+    #print(np.abs(stdx - stdy))
+    #plt.figure()
+    #plt.imshow(fit.reshape(dim, dim))   
+    #plt.colorbar()
+    #plt.show()
+    return stuff
+
+def fit_ps_fft(stuff):
+    fft = np.fft.fftshift(np.fft.fft2(np.fft.fftshift(np.pad(stuff, 500))))
+    FT = np.real(fft.conj()*fft)
+
+    cent = np.real(FT[590:610, 590:610])
+    #liney = cent[25, :] / np.max(cent[25, :])
+    #linex = cent[:, 25] / np.max(cent[:, 25])
+    #linexy = np.zeros(len(liney))
+    #for i in range(len(linexy)):
+        #linexy[i] = cent[i, i]
+    #linexy = linexy / np.max(linexy)
+    #linemean = (liney + linex + linexy) / 3
+
+    #plt.figure()
+    #plt.title('zoomed in FFT')
+    #plt.imshow(cent)
+    #plt.colorbar()
+    #plt.show()
+
+    #plt.figure()
+    #plt.title('slices of zoomed FFT')
+    #plt.scatter(range(len(liney)), liney)
+    #plt.scatter(range(len(linex)), linex)
+    #plt.scatter(range(len(linexy)), linexy)
+    #plt.scatter(range(len(linexy)), linemean)
+    #plt.legend(['mean'])
+    #plt.show()
+
+    xvals = np.linspace(-len(cent) / 2, len(cent) / 2, len(cent))
+    #yvals = linemean
+    def rotgauss2d(xy, A, B, D, E): 
+        angle = E
+        x = xy[0] * np.cos(angle) - xy[1] * np.sin(angle)
+        y = xy[1] * np.cos(angle) + xy[0] * np.sin(angle)
+        z = A*np.exp(-(1/B)*x**2 - (1/D)*y**2)
+        return z.ravel()
+    def sinc2(x, A, B, C):
+        y = (A*np.sin(B*x + C) / x)**2
+        return y
+    
+    xy = np.meshgrid(xvals, xvals)
+    parameters, covariance = curve_fit(rotgauss2d, xy, cent.ravel(), maxfev=5000, bounds=((-1e5, 0, 0, 0), (1e3, 1e3, 1e3, 2*np.pi)))     
+    if (parameters[1] or parameters[2]) <= 0:
+        raise Exception('Warning: returned invalid fit')
+    fit = rotgauss2d(xy, parameters[0], parameters[1], parameters[2], parameters[3])
+    fit = np.max(cent.ravel()) * fit / np.max(fit)
+    fit_unrot = rotgauss2d(xy, parameters[0], parameters[1], parameters[2], 0)
+    fit_unrot = np.max(cent.ravel()) * fit_unrot / np.max(fit_unrot)
+    ar = np.abs((parameters[1] / parameters[2]) - 1)
+    std1 = np.std(fit_unrot.reshape([len(cent), len(cent)])[:, int(len(cent)/2)])
+    std2 = np.std(fit_unrot.reshape([len(cent), len(cent)])[int(len(cent)/2), :])
+    sum2 = parameters[1]**2 + parameters[2]**2
+    #stdx = np.std(fit.reshape([len(cent), len(cent)])[:, int(len(cent)/2)])
+    #stdy = np.std(fit.reshape([len(cent), len(cent)])[int(len(cent)/2), :])
+
+    #print(parameters)
+
+    #plt.figure()
+    #plt.scatter(xvals, fit)
+    #plt.title('best gaussian fit')
+    #plt.scatter(range(len(linexy)), linemean)
+    #plt.scatter(xvals, yvals)
+    #plt.legend(['fit', 'data'])
+    #plt.show()
+
+    return parameters, covariance, fit, std1, std2, ar, cent, sum2
+
+    
+########################################################################################################
+########################################################################################################
+########################################################################################################
+    
+def calc_spacing(mask_design):
+
+    num_bins = 15
+    uvs = np.append(mask_design.uv_coords, -mask_design.uv_coords, axis=0)
+
+    xpos0 = -10
+    ypos0 = -10
+    count = 0
+    my_bins = np.zeros(num_bins)
+    bin_size = int(20 / int(np.sqrt(num_bins)))
+
+    for i in range(int(np.sqrt(num_bins))):
+        xpos = -10 + (i + 1) * bin_size
+        ypos0 = -10
+        for j in range(int(np.sqrt(num_bins))):
+            ypos = -10 + (j + 1) * bin_size
+            for k in uvs:
+                #print('is ' + str(k) + ' within ' + str(xpos0) + ' <= x < ' + str(xpos) + ' and ' + str(ypos0) + ' <= y < ' + str(ypos) + '?')
+                if k[0] < xpos and k[0] >= xpos0 and k[1] < ypos and k[1] >= ypos0:
+                    my_bins[count] += 1
+            count += 1
+            ypos0 = ypos
+        xpos0 = xpos
+
+    return(np.var(my_bins), num_bins)
