@@ -8,20 +8,6 @@ from scipy.optimize import curve_fit
 ########################################################################################################
 ########################################################################################################
 
-def check_valid_nholes(nholes):
-    if nholes < 3:
-        raise AttributeError(f"Oops! Please enter at least 3 holes for your mask.")
-    
-def check_valid_hrad(hrad):
-    if hrad < 0.01:
-        raise AttributeError(f'Oops! Hole size is too small.')
-    if hrad > 0.77:
-        raise AttributeError(f'Oops! Hole size is too big.')
-
-########################################################################################################
-########################################################################################################
-########################################################################################################
-
 def check_hole_cent(hcoords, aperture):
     hy = hcoords[0]
     hx = hcoords[1]
@@ -78,12 +64,11 @@ def check_spiders_gaps(hcoords, hrad, aperture):
 ########################################################################################################
 ########################################################################################################
 
-def add_hole_cent(rng, hcoords_list, vcoords):
-    a = np.array(rng.integers(low=0, high=len(vcoords)))
-    hcoords = vcoords[a] # + [545, 545] # convert proposed hole center coords to coords in aperture array
-    vcoords2 = np.delete(vcoords, a, 0)
-    hcoords_list.append(hcoords)
-    return np.array(hcoords), hcoords_list, vcoords2
+def add_hole_cent(rng, coord_options):
+    a = np.array(rng.integers(low=0, high=len(coord_options)))
+    hcoords = coord_options[a] # + [545, 545] # convert proposed hole center coords to coords in aperture array
+    coord_options2 = np.delete(coord_options, a, 0)
+    return np.array(hcoords), coord_options2
 
 ########################################################################################################
 ########################################################################################################
@@ -132,13 +117,14 @@ def add_hole(rng, aperture, my_design, hcoords_list):
 ########################################################################################################
 ########################################################################################################
 
-def check_redundancy(my_design):
+def check_redundancy(my_design, bw):
     """ Check mask baselines for redundancy
 
     Checks for any redundancy in the baselines of the proposed mask design. If redundancy is above 0%, reject the mask design.
 
     Args:
         my_design (object): An instance of design class. The proposed mask to be tested.
+        bw (float): Bandwidth of the instrument; default is to assume infinitely narrow band (optional)
 
     Returns:
         bool: Returns 1 if the mask has any redundancy, returns 0 if mask is fully non-redundant.
@@ -150,7 +136,7 @@ def check_redundancy(my_design):
     avg = 0
     count = 0
     fact = 2*np.pi*206265/lam
-    uv_rad = my_design.hrad * fact # need to change this
+    uv_rad = my_design.hrad # need to change this
     n = 50000
     ci = 0
     for i in my_design.uv_coords:
@@ -162,7 +148,6 @@ def check_redundancy(my_design):
                 cj += 1
                 continue
             cj += 1
-            b2 = j
             d1 = np.sqrt((b1[0] - b2[0])**2 + (b1[1] - b2[1])**2) # both are positive
             d2 = np.sqrt((-b1[0] - b2[0])**2 + (-b1[1] - b2[1])**2) # one is negative
             d = np.min([d1, d2])
@@ -185,7 +170,8 @@ def check_redundancy(my_design):
         avg_f = avg / count
     if avg_f > 0:
         return 1
-    return 'hello'
+    else:
+        return 0
 
 ########################################################################################################
 ########################################################################################################
@@ -210,6 +196,7 @@ def plot_design(my_design, aperture):
     """
 
     hcoords = my_design.xy_coords_cm
+    aperture2 = aperture.file * 1.0
 
     if np.ndarray.flatten(hcoords > 545).any():
         print('warning: coords not centered! fixing...')
@@ -219,10 +206,10 @@ def plot_design(my_design, aperture):
         for j in range(1090):
             for a in range(my_design.nholes):
                 if np.sqrt(((i - 545) - hcoords[a, 0])**2 + ((j - 545) - hcoords[a, 1])**2) < (100 * my_design.hrad):
-                     aperture[i, j] = 0
+                     aperture2[i, j] = 0
     
     plt.figure()
-    plt.imshow(aperture)
+    plt.imshow(aperture2)
     plt.xticks([])
     plt.yticks([])
     plt.show()
@@ -231,7 +218,7 @@ def plot_design(my_design, aperture):
 ########################################################################################################
 ########################################################################################################
 
-def make_design(nholes, hrad, return_vcoords=False): 
+def make_design(nholes, hrad, ap, return_vcoords=False, bw=0): 
     """ Generates mask design
 
     Generates a single non-redundant aperture mask design using the user-inputted number of holes and hole radius.
@@ -246,28 +233,22 @@ def make_design(nholes, hrad, return_vcoords=False):
         
     """
 
-    vcoords0 = np.loadtxt('/Users/kenzie/Desktop/Laniakea/Finalized_mask_pipeline/masks/vcoords_keck9hole.txt')
-    #aperture = pyfits.getdata('/Users/kenzie/Desktop/CodeAstro/planet-guts/keck_aperture.fits') # set Keck primary aperture
-
     while 1: # keep looping until we get a valid design
-        vcoords = vcoords0
+        coord_options = ap.hcmb_coords * 1.0
         my_design = design(nholes, hrad) # initialize design object
-        hcoords_list = []
         rng = np.random.default_rng(seed=None) # set random number generator
         for i in range(nholes): # keep adding and checking a single hole until it's acceptable
-            my_design.xy_coords_cm[i, :], hcoords_list, vcoords = add_hole_cent(rng, hcoords_list, vcoords)
+            my_design.xy_coords_cm[i, :], coord_options = add_hole_cent(rng, coord_options)
         my_design.get_xy_m() # convert (x,y) coords in cm to m
         my_design.get_uvs() # calculate design uv coordinates
-        rcheck = check_redundancy(my_design)  # check design for redundancy
-        if rcheck == 0: # if this statement is true, exit the loop and return our final design!
+        rcheck = check_redundancy(my_design, bw)  # check design for redundancy
+        if rcheck == 0: # if this statement is true, exit the loop and return our final design
             if return_vcoords == True:
-                return my_design, vcoords
+                return my_design, coord_options
             else:
-                #print("Yay! Mask design is non-redundant. Plotting design...")
-                #plot_design(my_design, aperture)
-            #    print("Done!")
-                print('stuff')
                 return my_design
+        #my_design.plot_uv()
+        #plot_design(my_design, ap.file)
             
 ########################################################################################################
 ########################################################################################################
