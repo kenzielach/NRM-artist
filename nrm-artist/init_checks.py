@@ -13,9 +13,14 @@ def check_valid_hrad(hrad):
     if hrad > 0.77:
         raise AttributeError(f'Hole size is too big.')
     
-def init_checks(nholes, hrad):
+def check_valid_scope(tn):
+    if tn != 'keck':
+        raise AttributeError(f'Invalid telescope.')
+    
+def init_checks(nholes, hrad, tn):
     check_valid_nholes(nholes)
     check_valid_hrad(hrad)
+    check_valid_scope(tn)
 
 ########################################################################################################
 ########################################################################################################

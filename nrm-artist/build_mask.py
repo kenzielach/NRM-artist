@@ -4,8 +4,8 @@ from aperture_class import *
 from init_checks import *
 import matplotlib.pyplot as plt
 
-def build_mask(nholes, hrad, tn):
-    init_checks(nholes, hrad)
-    ap = aperture(tn)
-    design = make_design(nholes, hrad, ap)
-    plot_design(design, ap)
+def build_mask(nholes, hrad, name):
+    init_checks(nholes, hrad, name) # make sure inputs are ok
+    ap = aperture(tn=name) # initialize aperture
+    design = make_design(nholes, hrad, ap, geometry='cent') # make design
+    return design, ap

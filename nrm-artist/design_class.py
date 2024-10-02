@@ -53,6 +53,9 @@ class design:
     def get_xy_m(self):
         self.xy_coords_m = self.make_xy_coords_m(self.xy_coords_cm)
         return self.xy_coords_m
+    
+    #def plot_mask(self):
+
                     
     def plot_uv(self):
         uv_plot = np.zeros([1090, 1090])
@@ -68,3 +71,7 @@ class design:
         plt.xticks([])
         plt.yticks([])
         plt.show()
+
+    def add_hole(self, hole, ind): # must give hole coords in m
+       self.xy_coords_cm[ind] = hole
+       self.xy_coords_m[ind] = self.xy_coords_cm[ind] / 100

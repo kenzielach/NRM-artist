@@ -8,16 +8,16 @@ class aperture:
     def load_hcmb_file(fname):
         return np.loadtxt(fname)
     
-    def __init__(self, tn='null', t_info=[]):
-        if tn == 'null':
-            self.ftf = t_info[0]
-            self.gap = t_info[1]
-            self.nsegs = t_info[2]
-            self.file = load_the_file(t_info[3])
-            self.hcmb_coords = load_hcmb_file(t_info[4])
+    def __init__(self, tn='null'):#, t_info=[]):
+        #if tn == 'null': # come back to this later
+        #    self.ftf = t_info[0]
+        #    self.gap = t_info[1]
+        #    self.nsegs = t_info[2]
+        #    self.file = load_the_file(t_info[3])
+        #    self.hcmb_coords = load_hcmb_file(t_info[4])
 
         if tn == 'keck':
-            self.ftf = 0 # segment flat-to-flat
+            self.ftf = 1.2 # segment flat-to-flat
             self.gap = 0.004 # gap between segments
             self.nsegs = 36 # number of segments
             self.file = pyfits.getdata('/Users/kenzie/Desktop/CodeAstro_2023/planet-guts/keck_aperture.fits')
