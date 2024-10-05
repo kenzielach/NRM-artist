@@ -27,71 +27,94 @@ def pick_hole_cent(rng, coord_options):
 ########################################################################################################
 ########################################################################################################
 
+def start_from0(nholes, hrad, rng, bw, hcmb_coords, geometry='cent'):
+            timeout = 0
+            while 1:
+                if timeout > 1000:
+                    raise Exception(f'Timed out, could not find valid design.')
+                my_design = design(nholes, hrad)
+                coord_options = hcmb_coords * 1.0
+                if geometry == 'cent':
+                    coord_options = hcmb_coords * 1.0
+                    for i in range(nholes):
+                        hole, coord_options = pick_hole_cent(rng, coord_options)
+                        my_design.add_hole(np.reshape(hole, [1, 2]), i)
+                my_design.get_xy_m() # convert (x,y) coords in cm to m
+                my_design.get_uvs() # calculate design uv coordinates
+                rcheck = check_redundancy(my_design, bw)  # check design for redundancy
+                if rcheck == 0: # if this statement is true, exit the loop and return our final design
+                    return my_design
+                timeout += 1
+
+########################################################################################################
+########################################################################################################
+########################################################################################################
+
+def start_from6(hcmb_coords, n, nholes, hrad, rng, bw, geometry='cent'):
+    if geometry == 'cent':
+        timeout1 = 0
+        while 1:
+            if timeout1 > 1000:
+                raise Exception(f'Timed out, could not find a non-redundant design.')
+            coord_options = hcmb_coords * 1.0
+            my_design0 = design(n, hrad)
+            for i in range(n):
+                hole, coord_options = pick_hole_cent(rng, coord_options)
+                my_design0.add_hole(np.reshape(hole, [1, 2]), i)
+            my_design0.get_xy_m()
+            my_design0.get_uvs()
+            rcheck = check_redundancy(my_design0, bw)
+            if rcheck == 0:
+                final = add_to_6hole(n, nholes, hrad, rng, coord_options, bw, my_design0.xy_coords_cm, geometry)
+                return final
+            timeout1 += 1
+    #if geometry == 'rand':
+
+########################################################################################################
+########################################################################################################
+########################################################################################################
+
+def add_to_6hole(n, nholes, hrad, rng, co, bw, xy0, geometry='cent'):
+    if geometry == 'cent':
+        timeout2 = 0
+        while 1:
+            tn = x_choose_y(24-n, nholes-n)
+            if timeout2 > tn:
+                break
+            coord_options2 = co * 1.0
+            my_design = design(nholes, hrad)
+            for i in range(n):
+                my_design.add_hole(xy0, i)
+            for i in range(nholes-n):
+                hole, coord_options2 = pick_hole_cent(rng, coord_options2)
+                my_design.add_hole(hole, n+i)
+            my_design.get_xy_m()
+            my_design.get_uvs()
+            rcheck2 = check_redundancy(my_design, bw)
+            if rcheck2 == 0:
+                return my_design
+            timeout2 += 1
+    #if geometry == 'rand':
+
+########################################################################################################
+########################################################################################################
+########################################################################################################
+
 def make_design(nholes, hrad, ap, bw=0, geometry='cent'):
     rng = np.random.default_rng(seed=None) # set random number generator
     n = 7
     if nholes > n:
-        if geometry == 'cent':
-            timeout1 = 0
-            while 1:
-                if timeout1 > 1000:
-                    raise Exception(f'Timed out, could not find a non-redundant design.')
-                coord_options = ap.hcmb_coords * 1.0
-                my_design0 = design(n, hrad)
-                for i in range(n):
-                    hole, coord_options = pick_hole_cent(rng, coord_options)
-                    my_design0.add_hole(np.reshape(hole, [1, 2]), i)
-                my_design0.get_xy_m()
-                my_design0.get_uvs()
-                rcheck = check_redundancy(my_design0, bw)
-                if rcheck == 0:
-                    timeout2 = 0
-                    while 1:
-                        tn = x_choose_y(24-n, nholes-n)
-                        if timeout2 > tn:
-                            break
-                        coord_options2 = coord_options * 1.0
-                        my_design = design(nholes, hrad)
-                        for i in range(n):
-                            my_design.add_hole(my_design0.xy_coords_cm[i], i)
-                        for i in range(nholes-n):
-                            hole, coord_options2 = pick_hole_cent(rng, coord_options2)
-                            my_design.add_hole(hole, n+i)
-                        my_design.get_xy_m()
-                        my_design.get_uvs()
-                        rcheck2 = check_redundancy(my_design, bw)
-                        if rcheck2 == 0:
-                            return my_design
-                        timeout2 += 1
-                timeout1 += 1
-        #if geometry == 'random':
-            # stuff
-        else:
-            raise AttributeError(f'Invalid geometry.')
+        final_design = start_from6(ap.hcmb_coords, n, nholes, hrad, rng, bw, geometry) # makes a 6 hole then adds on
+        return final_design
     else:
-        timeout = 0
-        while 1:
-            my_design = design(nholes, hrad)
-            coord_options = ap.hcmb_coords * 1.0
-            if timeout > 1000:
-                raise Exception(f'Timed out, could not find valid design.')
-            if geometry == 'cent':
-                coord_options = ap.hcmb_coords * 1.0
-                for i in range(nholes):
-                    hole, coord_options = pick_hole_cent(rng, coord_options)
-                    my_design.add_hole(np.reshape(hole, [1, 2]), i)
-            #if geometry == 'random': # randomly place holes, but still avoid furniture
-                #hole = pick_hole(rng)
-            else:
-                raise AttributeError(f'Invalid geometry.')
-            my_design.get_xy_m() # convert (x,y) coords in cm to m
-            my_design.get_uvs() # calculate design uv coordinates
-            rcheck = check_redundancy(my_design, bw)  # check design for redundancy
-            if rcheck == 0: # if this statement is true, exit the loop and return our final design
-                return my_design
-            timeout += 1
+        final_design = start_from0(nholes, hrad, rng, bw, ap.hcmb_coords, geometry)
+        return final_design
 
-def make_design2(nholes, hrad, ap, return_vcoords=False, bw=0, geometry='cent'): 
+########################################################################################################
+########################################################################################################
+########################################################################################################
+
+def make_design2(nholes, hrad, ap, return_vcoords=False, bw=0, geometry='cent'): # older version
     """ Generates mask design
 
     Generates a single non-redundant aperture mask design using the user-inputted number of holes and hole radius.
