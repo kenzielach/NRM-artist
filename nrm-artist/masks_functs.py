@@ -2,198 +2,119 @@ import numpy as np
 import matplotlib.pyplot as plt
 import astropy.io.fits as pyfits
 from design_class import *
+from scipy.optimize import curve_fit 
+from pupil_plane import *
+from redundancy_check import *
+from aperture_class import *
 
 ########################################################################################################
 ########################################################################################################
 ########################################################################################################
 
-def check_valid_nholes(nholes):
-    if nholes < 3:
-        raise AttributeError(f"Oops! Please enter at least 3 holes for your mask.")
-    
-def check_valid_hrad(hrad):
-    if hrad < 0.01:
-        raise AttributeError(f'Oops! Hole size is too small.')
-    if hrad > 0.77:
-        raise AttributeError(f'Oops! Hole size is too big.')
+def pick_hole_cent(rng, coord_options):
+    a = np.array(rng.integers(low=0, high=len(coord_options)))
+    coord_options2 = np.delete(coord_options, a, 0)
+    return coord_options[a], coord_options2
 
 ########################################################################################################
 ########################################################################################################
 ########################################################################################################
 
-def check_hole_cent(hcoords, aperture):
-    hy = hcoords[0]
-    hx = hcoords[1]
-    if aperture[hy, hx] == 0:
-        return False
+#def pick_hole(rng):
+
+
+########################################################################################################
+########################################################################################################
+########################################################################################################
+
+def start_from0(nholes, hrad, rng, bw, hcmb_coords, geometry='cent'):
+            timeout = 0
+            while 1:
+                if timeout > 1000:
+                    raise Exception(f'Timed out, could not find valid design.')
+                my_design = design(nholes, hrad)
+                coord_options = hcmb_coords * 1.0
+                if geometry == 'cent':
+                    coord_options = hcmb_coords * 1.0
+                    for i in range(nholes):
+                        hole, coord_options = pick_hole_cent(rng, coord_options)
+                        my_design.add_hole(np.reshape(hole, [1, 2]), i)
+                my_design.get_xy_m() # convert (x,y) coords in cm to m
+                my_design.get_uvs() # calculate design uv coordinates
+                rcheck = check_redundancy(my_design, bw)  # check design for redundancy
+                if rcheck == 0: # if this statement is true, exit the loop and return our final design
+                    return my_design
+                timeout += 1
+
+########################################################################################################
+########################################################################################################
+########################################################################################################
+
+def start_from6(hcmb_coords, n, nholes, hrad, rng, bw, geometry='cent'):
+    if geometry == 'cent':
+        timeout1 = 0
+        while 1:
+            if timeout1 > 1000:
+                raise Exception(f'Timed out, could not find a non-redundant design.')
+            coord_options = hcmb_coords * 1.0
+            my_design0 = design(n, hrad)
+            for i in range(n):
+                hole, coord_options = pick_hole_cent(rng, coord_options)
+                my_design0.add_hole(np.reshape(hole, [1, 2]), i)
+            my_design0.get_xy_m()
+            my_design0.get_uvs()
+            rcheck = check_redundancy(my_design0, bw)
+            if rcheck == 0:
+                final = add_to_6hole(n, nholes, hrad, rng, coord_options, bw, my_design0.xy_coords_cm, geometry)
+                return final
+            timeout1 += 1
+    #if geometry == 'rand':
+
+########################################################################################################
+########################################################################################################
+########################################################################################################
+
+def add_to_6hole(n, nholes, hrad, rng, co, bw, xy0, geometry='cent'):
+    if geometry == 'cent':
+        timeout2 = 0
+        while 1:
+            tn = x_choose_y(24-n, nholes-n)
+            if timeout2 > tn:
+                break
+            coord_options2 = co * 1.0
+            my_design = design(nholes, hrad)
+            for i in range(n):
+                my_design.add_hole(xy0, i)
+            for i in range(nholes-n):
+                hole, coord_options2 = pick_hole_cent(rng, coord_options2)
+                my_design.add_hole(hole, n+i)
+            my_design.get_xy_m()
+            my_design.get_uvs()
+            rcheck2 = check_redundancy(my_design, bw)
+            if rcheck2 == 0:
+                return my_design
+            timeout2 += 1
+    #if geometry == 'rand':
+
+########################################################################################################
+########################################################################################################
+########################################################################################################
+
+def make_design(nholes, hrad, ap, bw=0, geometry='cent'):
+    rng = np.random.default_rng(seed=None) # set random number generator
+    n = 7
+    if nholes > n:
+        final_design = start_from6(ap.hcmb_coords, n, nholes, hrad, rng, bw, geometry) # makes a 6 hole then adds on
+        return final_design
     else:
-        return True
+        final_design = start_from0(nholes, hrad, rng, bw, ap.hcmb_coords, geometry)
+        return final_design
 
 ########################################################################################################
 ########################################################################################################
 ########################################################################################################
 
-def check_hole_overlap(hcoords, hcoords_list, hrad):
-    if len(hcoords_list) == 0:
-        return True
-    else:
-        for i in hcoords_list:
-            dist = np.sqrt((i[0] - hcoords[0])**2 + (i[1] - hcoords[1])**2)
-            if dist < 100 * hrad:
-                return False
-            else:
-                continue
-
-
-########################################################################################################
-########################################################################################################
-########################################################################################################
-
-def check_spiders_gaps(hcoords, hrad, aperture):
-    """ Check placement of hole
-
-    Called by add_hole(). Checks that a proposed hole doesn't overlap other holes or spiders or mirror segment edges, and that it falls within the Keck aperture. If a hole does not meet requirements, hole is discarded and add_hole() is called again. Repeats until an acceptable hole location is found.
-
-    Args:
-        coords (array): numpy array containing the proposed (x,y) coordinates. 
-        design (object): Mask design object.
-        rng (object): Random number generator.
-        aperture (array): numpy array containing a boolean mask of the Keck primary.
-    
-    Returns:
-        array: returns the accepted (x,y) coordinates
-    """
-
-    xvals = np.arange(0, 1090, 1).reshape([1, 1090])
-    yvals = np.flip(np.arange(0, 1090, 1).reshape([1090, 1]))
-    distances = np.sqrt((xvals - hcoords[1])**2 + (yvals - hcoords[0])**2)
-    distances[distances < 1.0] = 1000.
-    distances[distances < (100 * hrad)] = -100.0
-    if np.min(distances + 200*aperture) < -10.0:
-        return False
-    return True
-
-########################################################################################################
-########################################################################################################
-########################################################################################################
-
-def add_hole(rng, aperture, my_design, hcoords_list):
-    """ Propose a new mask hole
-
-    Generates a proposed hole (x,y) coordinate set, then calls check_placement() to check whether these coordinates are acceptable. If they are, then these coordinates are returned. 
-    
-    Args:
-        hrad (float): Hole radius in meters.
-        rng (object): Random number generator.
-        aperture (array): numpy array containing a boolean mask of the Keck primary.
-    
-    Returns:
-        array: Returns a numpy array of the accepted hole (x,y) coordinates.
-    """
-    i = 0
-    flag = 0
-    while i < 50:
-        coords = np.array(rng.integers(low=-545, high=545, size=2))
-        hcoords = coords + [545, 545] # convert proposed hole center coords to coords in aperture array
-        if check_hole_cent(hcoords, aperture) == False:
-            continue
-        if check_spiders_gaps(hcoords, my_design.hrad, aperture) == False:
-            continue
-        if check_hole_overlap(hcoords, hcoords_list, my_design.hrad) == False:
-            continue
-        #if len(hcoords_list) > 0:
-        #    tmp_xycoords = np.array(list(my_design.xy_coords_cm) + hcoords)
-        #    tmp_design = design(my_design.nholes, my_design.hrad)
-        #    tmp_design.xy_coords_cm = tmp_xycoords
-        #    tmp_design.get_xy_m() # convert (x,y) coords in cm to m
-        #    tmp_design.get_uvs()
-        #    if check_redundancy(tmp_design) == 1:
-        #        i += 1
-        #        continue
-        hcoords_list.append(hcoords)
-        return np.array(hcoords), hcoords_list, flag
-    flag = 1
-    return np.array(hcoords), hcoords_list, flag
-
-########################################################################################################
-########################################################################################################
-########################################################################################################
-
-def check_redundancy(my_design):
-    """ Check mask baselines for redundancy
-
-    Checks for any redundancy in the baselines of the proposed mask design. If redundancy is above 0%, reject the mask design.
-
-    Args:
-        my_design (object): An instance of design class. The proposed mask to be tested.
-
-    Returns:
-        bool: Returns 1 if the mask has any redundancy, returns 0 if mask is fully non-redundant.
-    """
-
-    uv_rad = my_design.hrad
-    n = 50000
-    for i in my_design.uv_coords:
-        b1 = i
-        for j in my_design.uv_coords:
-            if i[0] == j[0] and i[1] == j[1]:
-                continue
-            b2 = j
-            d1 = np.sqrt((b1[0] - b2[0])**2 + (b1[1] - b2[1])**2) # both are positive
-            d2 = np.sqrt((-b1[0] - b2[0])**2 + (-b1[1] - b2[1])**2) # one is negative
-            d = np.min([d1, d2])
-            if d < 2*uv_rad:
-                test_uvs = np.random.uniform(low=0, high=2*uv_rad, size=(2,n))
-                dist_b1 = np.sqrt((test_uvs[0,:] - uv_rad)**2 + (test_uvs[1,:] - uv_rad)**2)
-                dist_b2 = np.sqrt((test_uvs[0,:] - (uv_rad + d))**2 + (test_uvs[1,:] - (uv_rad))**2)
-                count1 = (dist_b1 <= uv_rad).sum()
-                count2 = 0
-                for q in range(n):
-                    if dist_b1[q] <= uv_rad and dist_b2[q] < uv_rad:
-                        count2 += 1
-                red = np.round(count2 / count1, 2)
-                if red > 0.5:
-                    return 1
-    return 0
-
-########################################################################################################
-########################################################################################################
-########################################################################################################
-
-#def replace_hole(hrad, rng, aperture, hcoords_list):
-    
-    
-########################################################################################################
-########################################################################################################
-########################################################################################################
-
-def plot_design(my_design, aperture):
-    """ Plots finished design
-
-    Generates a matplotlib plot of the Keck aperture with the finished mask design projected.
-
-    Args:
-        my_design (object): Instance of design class representing the finished mask design.
-        aperture (array): Numpy array generated from the Keck aperture file provided.
-    
-    """
-
-    hcoords = my_design.xy_coords_cm
-    for i in range(1090):
-        for j in range(1090):
-            for a in range(my_design.nholes):
-                if np.sqrt((i - hcoords[a, 0])**2 + (j - hcoords[a, 1])**2) < (100 * my_design.hrad):
-                     aperture[i, j] = 0
-    plt.figure()
-    plt.imshow(aperture)
-    plt.colorbar()
-    plt.show()
-
-########################################################################################################
-########################################################################################################
-########################################################################################################
-
-def make_design(nholes, hrad): 
+def make_design2(nholes, hrad, ap, return_vcoords=False, bw=0, geometry='cent'): # older version
     """ Generates mask design
 
     Generates a single non-redundant aperture mask design using the user-inputted number of holes and hole radius.
@@ -201,36 +122,109 @@ def make_design(nholes, hrad):
     Args:
         nholes (int): Number of mask holes.
         hrad (float): Radius of projected holes in meters.
-
+        return_vcoords (bool): If True will also return list of hole (x,y) coordinates.
     Returns:
         object: Instance of the design class containing a single non-redundant aperture mask design.
-    
+        array (optional): Array containing list of hole (x,y) coordinates.
+        
     """
-   
+
     while 1: # keep looping until we get a valid design
-        my_design = design(nholes, hrad) # initialize design object
-        hcoords_list = []
-        rng = np.random.default_rng(seed=None) # set random number generator
-        aperture = pyfits.getdata('/Users/kenzie/Desktop/CodeAstro/planet-guts/keck_aperture.fits') # set Keck primary aperture
         for i in range(nholes): # keep adding and checking a single hole until it's acceptable
-            my_design.xy_coords_cm[i, :], hcoords_list, flag = add_hole(rng, aperture, my_design, hcoords_list)
-            if flag == 1:
-                break
-        if flag == 1:
-            print('hit a snag, starting over...')
-            continue
+            my_design.xy_coords_cm[i, :], coord_options = add_hole_cent(rng, coord_options)
         my_design.get_xy_m() # convert (x,y) coords in cm to m
         my_design.get_uvs() # calculate design uv coordinates
+        rcheck = check_redundancy(my_design, bw)  # check design for redundancy
+        if rcheck == 0: # if this statement is true, exit the loop and return our final design
+            if return_vcoords == True:
+                return my_design, coord_options
+            else:
+                return my_design
+        #my_design.plot_uv()
+        #plot_design(my_design, ap.file)
+            
+########################################################################################################
+########################################################################################################
+########################################################################################################
 
-        #print('Found holes, checking redundancy...')
-
-        rcheck = check_redundancy(my_design)  # check design for redundancy
-        if rcheck == 1: # if true, there's some redundancy and we need to start over
-            print("Uh-oh, mask has redundancies! " + "some baselines are redundant. Trying to fix...")
-        if rcheck == 0: # if this statement is true, exit the loop and return our final design!
-            print("Yay! Mask design is non-redundant. Plotting design...")
-            plot_design(my_design, aperture)
-            return my_design
-    
 def save_design(mask_design):
-    np.save('/Users/kenzie/Desktop/Laniakea/Finalized_mask_pipeline/masks/my_design.npy', mask_design)
+    n = mask_design.nholes
+    np.save('/Users/kenzie/Desktop/Laniakea/Finalized_mask_pipeline/masks/' + str(n) + 'hole_xycoords.npy', mask_design.xy_coords_m)
+    np.save('/Users/kenzie/Desktop/Laniakea/Finalized_mask_pipeline/masks/' + str(n) + 'hole_uvcoords.npy', mask_design.uv_coords)
+
+########################################################################################################
+########################################################################################################
+########################################################################################################
+
+def fit_ps_fft(stuff):
+    fft = np.fft.fftshift(np.fft.fft2(np.fft.fftshift(np.pad(stuff, 500))))
+    FT = np.real(fft.conj()*fft)
+
+    cent = np.real(FT[590:610, 590:610])
+    #liney = cent[25, :] / np.max(cent[25, :])
+    #linex = cent[:, 25] / np.max(cent[:, 25])
+    #linexy = np.zeros(len(liney))
+    #for i in range(len(linexy)):
+        #linexy[i] = cent[i, i]
+    #linexy = linexy / np.max(linexy)
+    #linemean = (liney + linex + linexy) / 3
+
+    #plt.figure()
+    #plt.title('zoomed in FFT')
+    #plt.imshow(cent)
+    #plt.colorbar()
+    #plt.show()
+
+    #plt.figure()
+    #plt.title('slices of zoomed FFT')
+    #plt.scatter(range(len(liney)), liney)
+    #plt.scatter(range(len(linex)), linex)
+    #plt.scatter(range(len(linexy)), linexy)
+    #plt.scatter(range(len(linexy)), linemean)
+    #plt.legend(['mean'])
+    #plt.show()
+
+    xvals = np.linspace(-len(cent) / 2, len(cent) / 2, len(cent))
+    #yvals = linemean
+    def rotgauss2d(xy, A, B, D, E): 
+        angle = E
+        x = xy[0] * np.cos(angle) - xy[1] * np.sin(angle)
+        y = xy[1] * np.cos(angle) + xy[0] * np.sin(angle)
+        z = A*np.exp(-(1/B)*x**2 - (1/D)*y**2)
+        return z.ravel()
+    def sinc2(x, A, B, C):
+        y = (A*np.sin(B*x + C) / x)**2
+        return y
+    
+    xy = np.meshgrid(xvals, xvals)
+    parameters, covariance = curve_fit(rotgauss2d, xy, cent.ravel(), maxfev=5000, bounds=((-1e5, 0, 0, 0), (1e3, 1e3, 1e3, 2*np.pi)))     
+    if (parameters[1] or parameters[2]) <= 0:
+        raise Exception('Warning: returned invalid fit')
+    fit = rotgauss2d(xy, parameters[0], parameters[1], parameters[2], parameters[3])
+    fit = np.max(cent.ravel()) * fit / np.max(fit)
+    fit_unrot = rotgauss2d(xy, parameters[0], parameters[1], parameters[2], 0)
+    fit_unrot = np.max(cent.ravel()) * fit_unrot / np.max(fit_unrot)
+    ar = np.abs((parameters[1] / parameters[2]) - 1)
+    std1 = np.std(fit_unrot.reshape([len(cent), len(cent)])[:, int(len(cent)/2)])
+    std2 = np.std(fit_unrot.reshape([len(cent), len(cent)])[int(len(cent)/2), :])
+    sum2 = parameters[1]**2 + parameters[2]**2
+    #stdx = np.std(fit.reshape([len(cent), len(cent)])[:, int(len(cent)/2)])
+    #stdy = np.std(fit.reshape([len(cent), len(cent)])[int(len(cent)/2), :])
+
+    #print(parameters)
+
+    #plt.figure()
+    #plt.scatter(xvals, fit)
+    #plt.title('best gaussian fit')
+    #plt.scatter(range(len(linexy)), linemean)
+    #plt.scatter(xvals, yvals)
+    #plt.legend(['fit', 'data'])
+    #plt.show()
+
+    return parameters, covariance, fit, std1, std2, ar, cent, sum2
+
+    
+########################################################################################################
+########################################################################################################
+########################################################################################################
+    
