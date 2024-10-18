@@ -12,7 +12,14 @@ def tc(mask):
     corr_xyz = correlate(corr_xy, mask, mode='full')
     return corr_xyz
 
-def make_mask_from_coords(coords, hrad):
+def subframe_tc(tc):
+    fact = 1090/len(mask_tc)
+    start = int(len(mask_tc)/2-1090/2)
+    stop = int(len(mask_tc)/2+1090/2)
+    mask_tc_subframe = scipy.ndimage.rotate(mask_tc[start:stop, start:stop], angle=180, reshape=False, order=3) 
+    return mask_tc_subframe
+
+def make_mask_from_coords(coords, hrad=0.01):
     res = 1090 # resolution of matrix, in units of cm of projected aperture
     mask = np.zeros([res, res])
     for a in range(len(coords)):
@@ -28,20 +35,15 @@ def make_mask_from_coords(coords, hrad):
 def plot_mask(mask):
     plt.figure()
     plt.imshow(mask)
-    plt.title('Mask Aperture')
+    #plt.title('Mask Aperture')
     plt.colorbar()
     plt.show()
 
 main_dir = '/Users/kenzie/Desktop/Laniakea/Finalized_mask_pipeline/'
 keck = aperture('keck')
 coords = np.loadtxt(main_dir + 'masks/SPIE_2024/final_mask_files/unrotated/m/9hole1_hp_m.txt')
-hrad = 0.668 # hole radius in coordinates of m
-mask = make_mask_from_coords(coords, hrad)
+mask = make_mask_from_coords(coords)
 print('finished making mask, working on tc...')
 mask_tc = tc(mask)
-fact = 1090/len(mask_tc)
-start = int(len(mask_tc)/2-1090/2)
-stop = int(len(mask_tc)/2+1090/2)
-mask_tc_subframe = scipy.ndimage.rotate(mask_tc[start:stop, start:stop], angle=180, reshape=False, order=3)
-#plot_mask(mask_tc_subframe**1.1+mask*2e9+keck.file*2e9)
-plot_mask(mask*2e9+mask_tc_subframe)
+mask_tc_subframe = subframe_tc(mask_tc)
+plot_mask(mask_tc_subframe*keck.file)
