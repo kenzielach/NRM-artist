@@ -5,6 +5,7 @@ import numpy as np
 class aperture: 
     def load_the_file(fname):
         return pyfits.getdata(fname)
+    
     def load_hcmb_file(fname):
         return np.loadtxt(fname)
     
@@ -22,6 +23,7 @@ class aperture:
             self.nsegs = 36 # number of segments
             self.file = pyfits.getdata('/Users/kenzie/Desktop/CodeAstro_2023/planet-guts/keck_aperture.fits')
             self.hcmb_coords = np.loadtxt('/Users/kenzie/Desktop/Laniakea/Finalized_mask_pipeline/masks/old/vcoords_keck9hole.txt') # honeycomb coords
+            self.fmatrix = np.load('/Users/kenzie/Desktop/Laniakea/Finalized_mask_pipeline/forbidden_matrix.npy')
 
     def plot_ap(self):
         plt.figure()

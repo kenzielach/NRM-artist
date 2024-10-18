@@ -10,5 +10,7 @@ def build_mask(nholes, hrad, tname, geometry='cent', method='guess'):
         ap = aperture(tn=tname) # initialize aperture
         design = make_design(nholes, hrad, ap, geometry) # make design
         return design, ap
-    #if method == 'TC':
-        # do triple correlation stuff
+    if method == 'TC':
+        init_checks(nholes, hrad, tname)
+        ap = aperture(tn=tname)
+        
