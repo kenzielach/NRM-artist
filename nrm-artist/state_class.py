@@ -16,7 +16,7 @@ class state:
         self.deadends.append(decoord)
         return self.deadends
 
-    def __init__(self):
+    def __init__(self, nholes):
         self.level = 0
-        self.mcoords = []
+        self.mcoords = np.zeros(nholes)
         self.deadends = []
