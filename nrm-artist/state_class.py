@@ -18,5 +18,5 @@ class state:
 
     def __init__(self, nholes):
         self.level = 0
-        self.mcoords = np.zeros(nholes)
+        self.mcoords = np.ones(nholes)
         self.deadends = []
