@@ -13,13 +13,13 @@ def tc(mask):
     return corr_xyz
 
 def subframe_tc(tc):
-    fact = 1090/len(mask_tc)
-    start = int(len(mask_tc)/2-1090/2)
-    stop = int(len(mask_tc)/2+1090/2)
-    mask_tc_subframe = scipy.ndimage.rotate(mask_tc[start:stop, start:stop], angle=180, reshape=False, order=3) 
+    fact = 1090/len(tc)
+    start = int(len(tc)/2-1090/2)
+    stop = int(len(tc)/2+1090/2)
+    mask_tc_subframe = scipy.ndimage.rotate(tc[start:stop, start:stop], angle=180, reshape=False, order=3) 
     return mask_tc_subframe
 
-def make_mask_from_coords(coords, hrad=0.01):
+def make_mask_from_coords(coords, hrad=0.5):
     res = 1090 # resolution of matrix, in units of cm of projected aperture
     mask = np.zeros([res, res])
     for a in range(len(coords)):
@@ -35,6 +35,12 @@ def make_mask_from_coords(coords, hrad=0.01):
 def plot_mask(mask):
     plt.figure()
     plt.imshow(mask)
-    #plt.title('Mask Aperture')
     plt.colorbar()
     plt.show()
+
+#def find_zeros(TC):
+    # finds zeros in the triple correlation, returns list of zero coords
+
+
+#def is_allowed(coords):
+    # checks if the chosen coordinate is excluded or not
