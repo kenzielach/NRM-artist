@@ -100,7 +100,7 @@ def add_to_6hole(n, nholes, hrad, rng, co, bw, xy0, geometry='cent'):
 ########################################################################################################
 ########################################################################################################
 
-def make_design(nholes, hrad, ap, bw=0, geometry='cent'):
+def make_design_guess(nholes, hrad, ap, bw=0, geometry='cent'):
     rng = np.random.default_rng(seed=None) # set random number generator
     n = 7
     if nholes > n:
